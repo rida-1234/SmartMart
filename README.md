@@ -20,11 +20,14 @@ An offline POS and inventory system for a small mart. It runs on one Windows PC 
 
 ## Develop
 
+**New here? Read [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**: setup on Windows/macOS/Linux, every file explained, how a sale flows through the code, and a learning checklist.
+
 ```bash
 composer install
 cp .env.example .env && php artisan key:generate
 touch database/database.sqlite
 php artisan migrate --seed
+php artisan db:seed --class=DemoSeeder   # practice data (not for the shop)
 php artisan test
 php artisan serve
 ```
