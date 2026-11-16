@@ -22,6 +22,11 @@ class User extends Authenticatable implements FilamentUser
 
     public const ROLE_CASHIER = 'cashier';
 
+    protected $attributes = [
+        'role' => self::ROLE_CASHIER,
+        'is_active' => true,
+    ];
+
     protected function casts(): array
     {
         return [

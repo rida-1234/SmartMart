@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
 use App\Models\Expense;
 use App\Models\Payment;
 use App\Models\Product;
-use App\Models\Customer;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\StockMovement;

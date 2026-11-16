@@ -10,16 +10,16 @@ class CustomerForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
-                TextInput::make('name')
-                    ->required(),
-                TextInput::make('phone')
-                    ->tel(),
-                TextInput::make('address'),
+                TextInput::make('name')->required()->maxLength(255),
+                TextInput::make('phone')->tel()->maxLength(32),
+                TextInput::make('address')->maxLength(255)->columnSpanFull(),
                 TextInput::make('balance')
-                    ->required()
+                    ->label('Opening credit (they owe the shop)')
                     ->numeric()
-                    ->default(0),
+                    ->default(0)
+                    ->visibleOn('create'),
             ]);
     }
 }
