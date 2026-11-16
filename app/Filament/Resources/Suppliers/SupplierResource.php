@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Suppliers;
 
+use App\Filament\Concerns\AdminOnly;
 use App\Filament\Resources\Suppliers\Pages\CreateSupplier;
 use App\Filament\Resources\Suppliers\Pages\EditSupplier;
 use App\Filament\Resources\Suppliers\Pages\ListSuppliers;
@@ -13,12 +14,19 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class SupplierResource extends Resource
 {
+    use AdminOnly;
+
     protected static ?string $model = Supplier::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|UnitEnum|null $navigationGroup = 'Inventory';
+
+    protected static ?int $navigationSort = 5;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTruck;
 
     public static function form(Schema $schema): Schema
     {
