@@ -14,17 +14,20 @@ An offline POS and inventory system for a small mart. It runs on one Windows PC 
 | Thermal receipt (80 mm) | Done: `/receipts/{sale}?print=1` |
 | Tests (21: money/stock flows, every screen, cashier limits, POS, import) | Passing: `php artisan test` |
 | Windows packaging (start/stop/backup .bat, php.ini, build.ps1, Inno Setup) | Done: `deploy/` |
-| Admin panel: products (CSV import, stock adjust), purchases, suppliers, customers, bills (reprint/return), expenses, users | Done: `app/Filament/Resources` |
+| Admin panel: products (Excel/CSV import + export, stock adjust), purchases, suppliers (Excel/CSV import + export), customers, bills (reprint/return), expenses, users | Done: `app/Filament/Resources` |
 | POS billing screen: scan/search, qty, discount, cash/card/wallet/credit, hold bills, auto-print | Done: `app/Filament/Pages/Pos.php` |
 | Reports + day closing, Settings (shop details, backup now), dashboard | Done: `app/Filament/Pages`, `app/Filament/Widgets` |
 
 ## Develop
+
+**New here? Read [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)**: setup on Windows/macOS/Linux, every file explained, how a sale flows through the code, and a learning checklist.
 
 ```bash
 composer install
 cp .env.example .env && php artisan key:generate
 touch database/database.sqlite
 php artisan migrate --seed
+php artisan db:seed --class=DemoSeeder   # practice data (not for the shop)
 php artisan test
 php artisan serve
 ```
@@ -61,11 +64,22 @@ The same installer is used for updates. It backs up the database, keeps shop dat
 Enter = add item · F2 = pay and print · F8 = hold bill · F9 = amount received · Esc = clear bill.
 Leave "amount received" empty for exact cash.
 
-## Importing products
+## Import and export (Excel or CSV)
 
-Products > Import CSV. In Excel, save the sheet as CSV with the columns
-`name, barcode, category, unit, cost_price, sale_price, stock, low_stock_level` (only `name` is required).
-Rows are matched by barcode, then by name; `stock` sets the counted stock and is logged as an adjustment.
+Products and Suppliers each have an **Import / Export** menu:
+
+- **Export** downloads Excel (.xlsx) or CSV. By default it contains only the rows matching the current search and filters (e.g. filter "Low stock" and export a reorder list).
+- **Import** accepts .xlsx or .csv. The first row holds the column names; only `name` is required. Existing rows are updated, new ones added; bad rows are listed and skipped.
+- **Empty template** downloads a blank sheet with the right columns.
+
+| List | Columns | Matched by |
+| --- | --- | --- |
+| Products | `name, barcode, category, unit, cost_price, sale_price, stock, low_stock_level, expiry_date, active` | barcode, then name |
+| Suppliers | `name, phone, address, balance` | name |
+
+Product `stock` sets the counted stock and is logged as an adjustment. Supplier `balance` is used only as the opening balance of a **new** supplier; existing balances change only through purchases and payments.
+
+Easiest workflow: export, edit in Excel, import the same file back.
 
 ## Restoring a backup
 

@@ -15,7 +15,8 @@ use App\Models\Setting;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\CheckoutService;
-use App\Services\ProductImportService;
+use App\Services\Sheets\ProductSheet;
+use Filament\Auth\Pages\Login;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -60,6 +61,14 @@ class AdminScreensTest extends TestCase
         foreach (['/admin/products', '/admin/purchases', '/admin/reports', '/admin/settings', '/admin/users', '/admin/expenses'] as $url) {
             $this->get($url)->assertForbidden();
         }
+    }
+
+    public function test_login_opens_the_billing_screen(): void
+    {
+        Livewire::test(Login::class)
+            ->fillForm(['email' => $this->cashier->email, 'password' => 'password'])
+            ->call('authenticate')
+            ->assertRedirect('/admin/pos');
     }
 
     public function test_guest_is_sent_to_login(): void
@@ -201,7 +210,7 @@ class AdminScreensTest extends TestCase
             ."Soap,555,Personal care,pcs,40,60,24\n"
             .",999,,,1,2,3\n");
 
-        $result = app(ProductImportService::class)->import($csv);
+        $result = app(ProductSheet::class)->import($csv);
         unlink($csv);
 
         $this->assertSame(1, $result['created']);
