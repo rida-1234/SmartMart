@@ -267,7 +267,9 @@ Every model has `$fillable` (which columns may be mass-assigned) and `casts()` (
 | `ReportService.php` | `summary($from, $to)` | Bills, net sales (after returns and bill discounts), cost of goods, gross and net profit, cash/card/credit split |
 | | `expectedCash($day, $openingCash)` | What should be in the drawer: opening + cash sales + cash part of credit sales + credit received in cash − supplier cash payments − expenses − cash refunds |
 | | `topProducts()`, `stockValue()`, `dues()` | Used by the Reports page |
-| `ProductImportService.php` | `import($csvPath)` | Reads a CSV saved from Excel. Matches by barcode, then name. Creates missing categories/units. A `stock` column is applied through `adjustStock` (so it's logged) |
+| `Sheets/Sheet.php` | `import($path)`, `exportRows($query)` | Base class for Excel/CSV import and export. Reads the header row, maps friendly names (e.g. "Price" → `sale_price`), saves each row in its own transaction, and reports per-row errors without stopping. Parses numbers, yes/no and dates (`YYYY-MM-DD`, `DD/MM/YYYY`, Excel date cells) |
+| `Sheets/ProductSheet.php` | | Products: matched by barcode, then name. Creates missing categories/units. A `stock` value goes through `adjustStock`, so it's logged |
+| `Sheets/SupplierSheet.php` | | Suppliers: matched by name (any capitals). `balance` is only the **opening** balance of a new supplier; existing balances are never changed by import (a warning is shown) |
 
 ### `app/Filament/` (the screens)
 
@@ -278,20 +280,21 @@ Resources/Products/
   ProductResource.php      ← menu entry, permissions, which pages exist
   Schemas/ProductForm.php  ← the create/edit form fields
   Tables/ProductsTable.php ← list columns, filters, row buttons
-  Pages/ListProducts.php   ← list page (+ header buttons: Import CSV, New)
+  Pages/ListProducts.php   ← list page (+ header buttons: Import / Export, New)
   Pages/CreateProduct.php  ← create page (+ custom save logic)
   Pages/EditProduct.php    ← edit page
 ```
 
 | File(s) | What's special |
 | --- | --- |
+| `Actions/SheetActions.php` | The **Import / Export** menu used on Products and Suppliers: Import (upload .xlsx or .csv), Export (Excel or CSV; by default only the rows matching the current search and filters) and an empty template |
 | `Concerns/AdminOnly.php` | A trait with `canAccess()` → only admins. Added to every owner-only resource/page. Filament hides the menu item and returns 403 on the URL |
 | `AvatarProviders/InitialsAvatarProvider.php` | Draws the user's initials locally (the default needs the internet) |
-| `../Providers/Filament/AdminPanelProvider.php` | Panel setup: `/admin` path, login page, brand name, home = POS, menu groups (Sales, Inventory, Accounts, Settings), auto-discovery of resources/pages/widgets |
+| `../Providers/Filament/AdminPanelProvider.php` | Panel setup: `/admin` path, login page, brand name, menu groups (Sales, Inventory, Accounts, Settings), auto-discovery of resources/pages/widgets |
 | `Pages/Pos.php` + `resources/views/filament/pages/pos.blade.php` | The billing screen. See [6.1](#61-a-cashier-scans-items-and-presses-f2) |
 | `Pages/Reports.php` + `reports.blade.php` | Date range, summary tiles, top products, day closing, stock value and balances |
 | `Pages/Settings.php` + `settings.blade.php` | A Filament form stored in the `settings` table, plus a **Backup now** button that runs the backup command |
-| `Resources/Products/*` | Opening stock is saved as a logged adjustment (`CreateProduct::handleRecordCreation`). Stock can't be edited on the edit form, only through **Adjust stock**. **Import CSV** button. No delete (old bills point to products); deactivate instead |
+| `Resources/Products/*` | Opening stock is saved as a logged adjustment (`CreateProduct::handleRecordCreation`). Stock can't be edited on the edit form, only through **Adjust stock**. **Import / Export** menu. No delete (old bills point to products); deactivate instead |
 | `Resources/Purchases/*` | Only List, Create and View pages: **no edit**. `CreatePurchase::handleRecordCreation` hands the form data to `PurchaseService` |
 | `Resources/Sales/*` (menu name "Bills") | `canCreate/canEdit/canDelete` all return false. `getEloquentQuery()` shows cashiers only their own bills. `ViewSale` has **Reprint** and **Return item** (owner only) |
 | `Resources/Customers/*`, `Suppliers/*` | **Receive payment** / **Pay** buttons call `LedgerService`. Opening balance can be set only when creating |
@@ -305,6 +308,8 @@ Resources/Products/
 | File | Purpose |
 | --- | --- |
 | `app/Http/Controllers/ReceiptController.php` + `resources/views/receipts/show.blade.php` | The 80 mm receipt page. `?print=1` makes it call `window.print()` when loaded |
+| `app/Support/Spreadsheet.php` | Reads and writes `.xlsx` and `.csv` with the OpenSpout library (no Microsoft Office needed). Copes with Excel quirks: `;` separators, old Windows text encoding, long barcodes stored as numbers, date cells |
+| `app/Http/Responses/LoginResponse.php` | After login, opens the billing screen instead of the dashboard (registered in `app/Providers/AppServiceProvider.php`) |
 | `app/Console/Commands/BackupDatabase.php` | `php artisan smartmart:backup`: safe copy with SQLite `VACUUM INTO`, extra copy to the folder in Settings, deletes backups older than 30 days |
 | `database/seeders/DatabaseSeeder.php` | What a fresh install starts with: admin, units, categories, settings. **Shipped to the shop** |
 | `database/seeders/DemoSeeder.php` | Practice data. **Not** for the shop |
@@ -393,7 +398,8 @@ php artisan test --filter=test_return_restores     # one test
 | File | What it proves |
 | --- | --- |
 | `tests/Feature/ShopFlowTest.php` | The services: cash sale, server-side prices, credit rules, returns, purchases, report numbers, stock adjustment |
-| `tests/Feature/AdminScreensTest.php` | Every screen opens for the owner; cashier gets 403 on owner screens; POS scan→pay→print; hold/resume; product create logs opening stock; purchase form; return button; reports and settings; CSV import |
+| `tests/Feature/AdminScreensTest.php` | Every screen opens for the owner; cashier gets 403 on owner screens; POS scan→pay→print; hold/resume; product create logs opening stock; purchase form; return button; reports and settings; CSV import; login lands on billing |
+| `tests/Feature/ImportExportTest.php` | Excel and CSV import for products and suppliers, friendly headers, long barcodes and dates, `;` files, bad rows reported (and not half-saved), supplier balances protected, export→import changes nothing, download buttons work |
 | `tests/Feature/BackupTest.php` | The backup command writes a file |
 
 Tests use `RefreshDatabase`, so each test starts with empty tables in memory. Read a test first when you want to understand a feature: it shows the exact inputs and expected numbers.
@@ -486,5 +492,7 @@ Tick these off in order. Each one points you at code to read.
 - [ ] Find where cashiers are blocked from Products (hint: `AdminOnly`)
 - [ ] Find why cashiers only see their own bills (hint: `getEloquentQuery`)
 - [ ] Trace a purchase from `PurchaseForm` to `PurchaseService`
+- [ ] Export products to Excel, change a price, import it back, and find the change
+- [ ] Read `Sheet::import()` and find why one bad row doesn't stop the others
 - [ ] Run `php artisan smartmart:backup` and open the file it made
 - [ ] Make the practice change in [section 8](#8-how-to-make-a-change-safely) on a branch, with a test
